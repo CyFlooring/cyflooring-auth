@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C.Y. Flooring — Credit Card Authorization</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #1A2744; --gold: #C9A84C; --bg: #F7F8FA; --white: #fff;
+    --border: #DDE1EA; --text: #1A1A2E; --muted: #6B7280;
+    --error: #DC2626; --radius: 12px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
+
+  .header { background: var(--navy); padding: 22px 20px 18px; text-align: center; position: relative; }
+  .header::after { content:''; display:block; height:4px; background:var(--gold); position:absolute; bottom:0; left:0; right:0; }
+  .header-logo { font-size:26px; font-weight:800; color:#fff; letter-spacing:1px; }
+  .header-sub { font-size:12px; color:#A8BADC; margin-top:4px; }
+  .form-badge { display:inline-block; margin-top:10px; background:rgba(201,168,76,.18); border:1px solid var(--gold); color:var(--gold); font-size:11px; font-weight:700; letter-spacing:1.5px; padding:4px 12px; border-radius:20px; text-transform:uppercase; }
+
+  .container { max-width:520px; margin:0 auto; padding:0 16px; }
+
+  .steps-box { background:#EEF2FF; border:1px solid #C7D2FE; border-radius:10px; padding:14px 16px; margin:16px 0 20px; display:flex; flex-direction:column; gap:10px; }
+  .steps-box .steps-title { font-weight:700; font-size:13px; color:var(--navy); }
+  .step-row { display:flex; align-items:flex-start; gap:10px; }
+  .step-num-badge { background:var(--navy); color:var(--gold); font-weight:800; font-size:12px; min-width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .step-row span { font-size:13px; color:var(--text); line-height:1.5; }
+
+  .section-card { background:#fff; border-radius:var(--radius); border:1px solid var(--border); margin-bottom:16px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .section-title { background:var(--navy); color:#fff; font-size:11px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; padding:10px 16px; display:flex; align-items:center; gap:8px; }
+  .section-title .snum { background:var(--gold); color:var(--navy); width:20px; height:20px; border-radius:50%; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .section-body { padding:16px; }
+
+  .field { margin-bottom:14px; }
+  .field:last-child { margin-bottom:0; }
+  .field label { display:block; font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.8px; text-transform:uppercase; margin-bottom:6px; }
+  .req { color:var(--error); margin-left:2px; }
+  input[type="text"], input[type="tel"] {
+    width:100%; border:1.5px solid var(--border); border-radius:8px; padding:12px 14px;
+    font-size:16px; color:var(--text); background:#fff; outline:none;
+    transition:border-color .15s, box-shadow .15s; -webkit-appearance:none;
+  }
+  input:focus { border-color:var(--navy); box-shadow:0 0 0 3px rgba(26,39,68,.12); }
+  input.err { border-color:var(--error); }
+  input[readonly] { background:#f3f4f6; color:var(--muted); }
+  .row-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .card-type-group { display:flex; gap:12px; }
+  .card-option { flex:1; }
+  .card-option input[type="radio"] { display:none; }
+  .card-option label { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:14px 8px; border:2px solid var(--border); border-radius:10px; cursor:pointer; background:var(--bg); font-size:12px; font-weight:600; color:var(--muted); transition:all .15s; }
+  .card-option input[type="radio"]:checked + label { border-color:var(--navy); background:#EEF2FF; color:var(--navy); box-shadow:0 0 0 3px rgba(26,39,68,.1); }
+
+  .auth-option { margin-bottom:10px; }
+  .auth-option input[type="radio"] { display:none; }
+  .auth-option label { display:flex; align-items:flex-start; gap:12px; padding:14px; border:2px solid var(--border); border-radius:10px; cursor:pointer; background:var(--bg); line-height:1.4; transition:all .15s; }
+  .auth-option input[type="radio"]:checked + label { border-color:var(--navy); background:#EEF2FF; }
+  .radio-dot { width:20px; height:20px; border:2px solid var(--border); border-radius:50%; flex-shrink:0; margin-top:1px; background:#fff; display:flex; align-items:center; justify-content:center; transition:all .15s; }
+  .radio-dot::after { content:''; width:10px; height:10px; border-radius:50%; background:var(--navy); opacity:0; transition:opacity .15s; }
+  .auth-option input[type="radio"]:checked + label .radio-dot { border-color:var(--navy); }
+  .auth-option input[type="radio"]:checked + label .radio-dot::after { opacity:1; }
+  .auth-label-text strong { display:block; font-size:14px; font-weight:700; color:var(--navy); }
+  .auth-label-text span { font-size:12.5px; color:var(--muted); }
+
+  #delegate-fields { display:none; background:#F0F4FF; border:1px solid #C7D2FE; border-radius:8px; padding:14px; margin-top:-4px; margin-bottom:10px; }
+  #delegate-fields.visible { display:block; }
+
+  .field-error { font-size:12px; color:var(--error); margin-top:4px; display:none; }
+  .field-error.show { display:block; }
+
+  .agreement-box { background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:12px 14px; font-size:12.5px; color:#92400E; line-height:1.6; margin-bottom:14px; }
+
+  .sig-wrap { border:1.5px solid var(--border); border-radius:8px; background:#fff; overflow:hidden; position:relative; }
+  canvas#sig-canvas { display:block; width:100%; height:130px; cursor:crosshair; touch-action:none; }
+  .sig-actions { display:flex; justify-content:space-between; align-items:center; padding:6px 10px; border-top:1px solid var(--border); background:var(--bg); }
+  .sig-hint { font-size:11px; color:var(--muted); }
+  .sig-clear { font-size:12px; color:var(--error); background:none; border:none; cursor:pointer; font-weight:600; padding:4px 8px; }
+  #sig-placeholder { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:13px; color:#BBBBBB; pointer-events:none; white-space:nowrap; }
+
+  .green-box { background:#F0FDF4; border:1px solid #86EFAC; border-radius:8px; padding:12px 14px; margin-bottom:12px; font-size:13px; color:#166534; line-height:1.6; }
+
+  .submit-btn { width:100%; background:var(--navy); color:#fff; border:none; border-radius:12px; padding:16px; font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:8px; transition:background .15s, transform .1s; }
+  .submit-btn:active { transform:scale(.98); }
+
+  #success-screen { display:none; text-align:center; padding:40px 20px; }
+  #success-screen.visible { display:block; }
+  .success-icon { width:72px; height:72px; background:#DCFCE7; border-radius:50%; margin:0 auto 16px; display:flex; align-items:center; justify-content:center; }
+  #success-screen h2 { font-size:22px; color:var(--navy); margin-bottom:10px; }
+  #success-screen p { font-size:14px; color:var(--muted); line-height:1.8; }
+  #main-form.hidden { display:none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">C.Y. FLOORING</div>
+  <div class="header-sub">1228 Compton Ave, Los Angeles, CA 90021 · 213-806-9926</div>
+  <div class="form-badge">Credit Card Authorization</div>
+</div>
+
+<div class="container">
+
+  <div class="steps-box">
+    <div class="steps-title">How it works:</div>
+    <div class="step-row"><div class="step-num-badge">1</div><span>Please fill out the form below.</span></div>
+    <div class="step-row"><div class="step-num-badge">2</div><span>Click <strong>Submit</strong> — your PDF will download automatically.</span></div>
+    <div class="step-row"><div class="step-num-badge">3</div><span>Email the PDF to <strong>cyflooringco@gmail.com</strong> or text it to <strong>213-806-9901</strong> — and include a photo of your <strong>ID</strong> and <strong>Front &amp; Back of your card</strong>.</span></div>
+  </div>
+
+  <div id="main-form">
+
+    <div class="section-card">
+      <div class="section-title"><span class="snum">1</span> Card Information</div>
+      <div class="section-body">
+        <div class="field">
+          <label>Card Type <span class="req">*</span></label>
+          <div class="card-type-group">
+            <div class="card-option">
+              <input type="radio" name="card_type" id="visa" value="Visa">
+              <label for="visa">
+                <svg width="52" height="32" viewBox="0 0 52 32"><rect width="52" height="32" rx="4" fill="#1A1F71"/><text x="26" y="22" text-anchor="middle" font-family="Arial" font-size="16" font-weight="900" font-style="italic" fill="white">VISA</text></svg>
+                Visa
+              </label>
+            </div>
+            <div class="card-option">
+              <input type="radio" name="card_type" id="mastercard" value="Mastercard">
+              <label for="mastercard">
+                <svg width="52" height="32" viewBox="0 0 52 32"><rect width="52" height="32" rx="4" fill="#252525"/><circle cx="20" cy="16" r="10" fill="#EB001B"/><circle cx="32" cy="16" r="10" fill="#F79E1B"/><path d="M26 8.1a10 10 0 0 1 0 15.8A10 10 0 0 1 26 8.1z" fill="#FF5F00"/></svg>
+                Mastercard
+              </label>
+            </div>
+          </div>
+          <div class="field-error" id="err-card-type">Please select a card type.</div>
+        </div>
+        <div class="field">
+          <label>Name on Card <span class="req">*</span></label>
+          <input type="text" id="card-name" placeholder="As it appears on the card">
+          <div class="field-error" id="err-card-name">Please enter the name on the card.</div>
+        </div>
+        <div class="field">
+          <label>Card Number <span class="req">*</span></label>
+          <input type="tel" id="card-number" placeholder="•••• •••• •••• ••••" maxlength="19" inputmode="numeric">
+          <div class="field-error" id="err-card-number">Please enter a valid 16-digit card number.</div>
+        </div>
+        <div class="row-2">
+          <div class="field">
+            <label>Expiration <span class="req">*</span></label>
+            <input type="tel" id="exp-date" placeholder="MM / YY" maxlength="7" inputmode="numeric">
+            <div class="field-error" id="err-exp-date">Enter MM / YY.</div>
+          </div>
+          <div class="field">
+            <label>CVV <span class="req">*</span></label>
+            <input type="tel" id="cvv" placeholder="•••" maxlength="4" inputmode="numeric">
+            <div class="field-error" id="err-cvv">Enter CVV.</div>
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="field">
+            <label>Charge Amount ($)</label>
+            <input type="tel" id="charge-amount" placeholder="To be determined" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label>Invoice / PO #</label>
+            <input type="text" id="invoice-num" placeholder="Optional">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-title"><span class="snum">2</span> Contact &amp; Billing</div>
+      <div class="section-body">
+        <div class="field">
+          <label>Contact Phone <span class="req">*</span></label>
+          <input type="tel" id="contact-phone" placeholder="(000) 000-0000" inputmode="tel">
+          <div class="field-error" id="err-contact-phone">Please enter your phone number.</div>
+        </div>
+        <div class="field">
+          <label>Billing Address <span class="req">*</span></label>
+          <input type="text" id="billing-address" placeholder="Street, City, State, ZIP">
+          <div class="field-error" id="err-billing-address">Please enter your billing address.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-title"><span class="snum">3</span> Authorization Preference</div>
+      <div class="section-body">
+        <div class="auth-option">
+          <input type="radio" name="auth_pref" id="pref-self" value="Contact me for each order">
+          <label for="pref-self">
+            <span class="radio-dot"></span>
+            <span class="auth-label-text">
+              <strong>Contact me for each order</strong>
+              <span>C.Y. Flooring will call me to confirm every order.</span>
+            </span>
+          </label>
+        </div>
+        <div class="auth-option">
+          <input type="radio" name="auth_pref" id="pref-delegate" value="My employee can authorize orders">
+          <label for="pref-delegate">
+            <span class="radio-dot"></span>
+            <span class="auth-label-text">
+              <strong>My employee / associate can authorize orders</strong>
+              <span>They can approve orders on my behalf without calling me each time.</span>
+            </span>
+          </label>
+        </div>
+        <div id="delegate-fields">
+          <div class="field">
+            <label>Employee / Associate Name <span class="req">*</span></label>
+            <input type="text" id="delegate-name" placeholder="Full name">
+            <div class="field-error" id="err-delegate-name">Please enter their name.</div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Their Contact Number <span class="req">*</span></label>
+            <input type="tel" id="delegate-phone" placeholder="(000) 000-0000" inputmode="tel">
+            <div class="field-error" id="err-delegate-phone">Please enter their number.</div>
+          </div>
+        </div>
+        <div class="auth-option">
+          <input type="radio" name="auth_pref" id="pref-keep" value="Keep card on file for future phone orders">
+          <label for="pref-keep">
+            <span class="radio-dot"></span>
+            <span class="auth-label-text">
+              <strong>Keep my card on file for future orders</strong>
+              <span>C.Y. Flooring can charge this card for future orders without a new form.</span>
+            </span>
+          </label>
+        </div>
+        <div class="field-error" id="err-auth-pref" style="margin-top:4px">Please select an option.</div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-title"><span class="snum">4</span> Signature &amp; Agreement</div>
+      <div class="section-body">
+        <div class="agreement-box">
+          By signing, I confirm I am the authorized cardholder and authorize C.Y. Flooring to charge the amount stated above to my card. This authorization remains in effect until I notify C.Y. Flooring in writing to cancel it.
+        </div>
+        <div class="row-2" style="margin-bottom:14px">
+          <div class="field" style="margin-bottom:0">
+            <label>Print Name <span class="req">*</span></label>
+            <input type="text" id="print-name" placeholder="Full name">
+            <div class="field-error" id="err-print-name">Please enter your name.</div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Date</label>
+            <input type="text" id="sign-date" readonly>
+          </div>
+        </div>
+        <div class="field">
+          <label>Signature <span class="req">*</span> <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;color:#9CA3AF;">(draw with your finger or mouse)</span></label>
+          <div class="sig-wrap">
+            <canvas id="sig-canvas"></canvas>
+            <div id="sig-placeholder">✍️ Sign here</div>
+          </div>
+          <div class="sig-actions">
+            <span class="sig-hint">Draw your signature above</span>
+            <button type="button" class="sig-clear" onclick="clearSig()">Clear</button>
+          </div>
+          <div class="field-error" id="err-sig">Please provide your signature.</div>
+        </div>
+        <div class="green-box">
+          <strong>📎 After you submit:</strong> Your PDF will download automatically. Email it to <strong>cyflooringco@gmail.com</strong> or text it to <strong>213-806-9901</strong> — and please include a photo of your <strong>ID</strong> and <strong>Front &amp; Back of your card</strong>.
+        </div>
+        <button class="submit-btn" onclick="submitForm()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Submit — Get My PDF
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SUCCESS -->
+  <div id="success-screen">
+    <div class="success-icon">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h2>Your PDF is downloading!</h2>
+    <p>
+      Please send the downloaded PDF to C.Y. Flooring by<br>
+      <strong>email or text</strong> — whichever is easiest for you.<br><br>
+      📸 Also please include a photo of your <strong>ID</strong> and<br>
+      <strong>Front &amp; Back of your card</strong>.<br><br>
+      <strong>Send to:</strong><br>
+      📧 cyflooringco@gmail.com<br>
+      📱 Text: 213-806-9901<br><br>
+      Questions? Call us at <strong>213-806-9926</strong>
+    </p>
+    <button class="submit-btn" style="max-width:320px;margin:20px auto 0;" onclick="redownload()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download PDF Again
+    </button>
+  </div>
+
+</div>
+
+<script>
+let formData = {};
+
+// Set today
+const today = new Date();
+document.getElementById('sign-date').value =
+  (today.getMonth()+1).toString().padStart(2,'0') + '/' +
+  today.getDate().toString().padStart(2,'0') + '/' +
+  today.getFullYear();
+
+// Formatters
+document.getElementById('card-number').addEventListener('input', function(e) {
+  let v = e.target.value.replace(/\D/g,'').slice(0,16);
+  e.target.value = v.replace(/(.{4})/g,'$1 ').trim();
+});
+document.getElementById('exp-date').addEventListener('input', function(e) {
+  let v = e.target.value.replace(/\D/g,'').slice(0,4);
+  if (v.length >= 3) v = v.slice(0,2) + ' / ' + v.slice(2);
+  e.target.value = v;
+});
+function fmtPhone(el) {
+  el.addEventListener('input', function(e) {
+    let v = e.target.value.replace(/\D/g,'').slice(0,10);
+    if (v.length >= 7) v = '('+v.slice(0,3)+') '+v.slice(3,6)+'-'+v.slice(6);
+    else if (v.length >= 4) v = '('+v.slice(0,3)+') '+v.slice(3);
+    else if (v.length) v = '('+v;
+    e.target.value = v;
+  });
+}
+fmtPhone(document.getElementById('contact-phone'));
+fmtPhone(document.getElementById('delegate-phone'));
+
+document.querySelectorAll('input[name="auth_pref"]').forEach(r => {
+  r.addEventListener('change', () => {
+    document.getElementById('delegate-fields').classList.toggle(
+      'visible', document.getElementById('pref-delegate').checked
+    );
+    document.getElementById('err-auth-pref').classList.remove('show');
+  });
+});
+
+// Signature
+const canvas = document.getElementById('sig-canvas');
+const ctx = canvas.getContext('2d');
+let drawing = false, hasSig = false;
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.getBoundingClientRect().width;
+  canvas.width = w * dpr; canvas.height = 130 * dpr;
+  ctx.scale(dpr, dpr);
+  canvas.style.width = w + 'px'; canvas.style.height = '130px';
+  ctx.strokeStyle = '#1A2744'; ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+function pos(e) {
+  const r = canvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX - r.left, y: t.clientY - r.top };
+}
+canvas.addEventListener('mousedown', e => { drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); document.getElementById('sig-placeholder').style.display='none'; });
+canvas.addEventListener('mousemove', e => { if(!drawing) return; const p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); hasSig=true; });
+canvas.addEventListener('mouseup', () => drawing=false);
+canvas.addEventListener('mouseleave', () => drawing=false);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); document.getElementById('sig-placeholder').style.display='none'; }, {passive:false});
+canvas.addEventListener('touchmove', e => { e.preventDefault(); if(!drawing) return; const p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); hasSig=true; }, {passive:false});
+canvas.addEventListener('touchend', () => drawing=false);
+function clearSig() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  hasSig=false;
+  document.getElementById('sig-placeholder').style.display='block';
+}
+
+// Validation
+function val(id, errId, ok) {
+  document.getElementById(id)?.classList.toggle('err', !ok);
+  document.getElementById(errId)?.classList.toggle('show', !ok);
+  return ok;
+}
+['card-name','card-number','exp-date','cvv','contact-phone','billing-address','print-name','delegate-name','delegate-phone'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', () => {
+    document.getElementById(id).classList.remove('err');
+    const e = document.getElementById('err-'+id);
+    if(e) e.classList.remove('show');
+  });
+});
+
+// ── GENERATE PDF ───────────────────────────────────────────────
+function generatePDF(data) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const W = 612, M = 40, CW = W - M*2;
+  let y = 0;
+
+  const NAVY = [26,39,68], GOLD = [201,168,76], WHITE = [255,255,255],
+        LGRAY = [221,225,234], GRAY = [107,114,128], TEXT = [26,26,46],
+        LYELLOW = [255,251,235], DYELLOW = [253,230,138], ORANGE = [146,64,14],
+        LGREEN = [240,253,244], DGREEN = [134,239,172], SGREEN = [22,101,52],
+        LBLUE = [238,242,255], DBLUE = [199,210,254];
+
+  function setFont(style, size, color) {
+    doc.setFont('helvetica', style);
+    doc.setFontSize(size);
+    doc.setTextColor(...(color || TEXT));
+  }
+  function fillRect(x,y,w,h,color) { doc.setFillColor(...color); doc.rect(x,y,w,h,'F'); }
+  function strokeRect(x,y,w,h,color,lw) {
+    doc.setDrawColor(...color); doc.setLineWidth(lw||0.5);
+    doc.rect(x,y,w,h,'S');
+  }
+
+  // ── HEADER ──
+  fillRect(0,0,W,64,NAVY);
+  fillRect(0,64,W,4,GOLD);
+  setFont('bold',20,WHITE);
+  doc.text('C.Y. FLOORING', M, 28);
+  setFont('normal',8,[168,186,220]);
+  doc.text('1228 Compton Ave, Los Angeles, CA 90021  ·  Tel: 213-806-9926', M, 42);
+  setFont('bold',10,GOLD);
+  doc.text('CREDIT CARD AUTHORIZATION FORM', W-M, 34, {align:'right'});
+  y = 78;
+
+  function sectionBar(label) {
+    fillRect(M, y, CW, 18, NAVY);
+    fillRect(M, y, 3, 18, GOLD);
+    setFont('bold', 8, WHITE);
+    doc.text(label, M+10, y+12);
+    y += 26;
+  }
+
+  function fieldRow(label, value, x, w) {
+    setFont('bold', 7, GRAY);
+    doc.text(label, x, y);
+    setFont('normal', 9, TEXT);
+    doc.text(value || '', x, y+13);
+    doc.setDrawColor(...LGRAY); doc.setLineWidth(0.5);
+    doc.line(x, y+15, x+w-6, y+15);
+  }
+
+  function twoFields(l1,v1,l2,v2,w1ratio) {
+    const w1 = CW*w1ratio, w2 = CW*(1-w1ratio)-8;
+    fieldRow(l1,v1,M,w1);
+    fieldRow(l2,v2,M+w1+8,w2);
+    y += 30;
+  }
+
+  function oneField(label, value) {
+    fieldRow(label, value, M, CW);
+    y += 30;
+  }
+
+  // ── SECTION 1 ──
+  sectionBar('1   CARD INFORMATION');
+
+  // Card type boxes — clean circles, no text underneath
+  setFont('bold',7,GRAY); doc.text('CARD TYPE', M, y+8);
+  const cardSelected = data.cardType === 'Visa' ? 'Visa' : 'Mastercard';
+  const cardBoxW = 90, cardBoxH = 30, cardGap = 24;
+  const visaX = M + 80, mcX = M + 80 + cardBoxW + cardGap;
+
+  // Visa box
+  fillRect(visaX, y, cardBoxW, cardBoxH, [26,31,113]);
+  setFont('bold',12,WHITE); doc.text('VISA', visaX+cardBoxW/2, y+20, {align:'center'});
+  // Visa circle indicator
+  doc.setDrawColor(...LGRAY); doc.setFillColor(255,255,255); doc.setLineWidth(1);
+  doc.circle(visaX - 10, y + cardBoxH/2, 5, 'FD');
+  if(cardSelected === 'Visa') {
+    doc.setFillColor(...NAVY); doc.circle(visaX - 10, y + cardBoxH/2, 3, 'F');
+  }
+
+  // Mastercard box
+  fillRect(mcX, y, cardBoxW, cardBoxH, [37,37,37]);
+  doc.setFillColor(235,0,27); doc.circle(mcX+32, y+15, 11, 'F');
+  doc.setFillColor(247,158,27); doc.circle(mcX+58, y+15, 11, 'F');
+  doc.setFillColor(255,95,0); doc.rect(mcX+38, y+4, 14, 22, 'F');
+  // Mastercard circle indicator
+  doc.setDrawColor(...LGRAY); doc.setFillColor(255,255,255); doc.setLineWidth(1);
+  doc.circle(mcX - 10, y + cardBoxH/2, 5, 'FD');
+  if(cardSelected === 'Mastercard') {
+    doc.setFillColor(...NAVY); doc.circle(mcX - 10, y + cardBoxH/2, 3, 'F');
+  }
+
+  y += cardBoxH + 12;
+
+  twoFields('NAME ON CARD', data.cardName, 'EXPIRATION DATE', data.expDate, 0.62);
+  twoFields('CARD NUMBER', data.cardNumber, 'CVV', data.cvv, 0.62);
+  twoFields('CHARGE AMOUNT', data.chargeAmount ? '$'+data.chargeAmount : 'To be determined', 'INVOICE / PO #', data.invoice||'N/A', 0.55);
+  y += 2;
+
+  // ── SECTION 2 ──
+  sectionBar('2   CONTACT & BILLING');
+  twoFields('CONTACT PHONE', data.phone, 'BILLING ADDRESS', data.billing, 0.42);
+  y += 2;
+
+  // ── SECTION 3 ──
+  sectionBar('3   AUTHORIZATION PREFERENCE');
+
+  function authBox(label, desc, selected) {
+    const bh = 34;
+    fillRect(M, y, CW, bh, [247,248,250]);
+    strokeRect(M, y, CW, bh, selected ? NAVY : LGRAY, selected ? 1.5 : 0.5);
+    // Circle
+    doc.setDrawColor(...(selected ? NAVY : LGRAY));
+    doc.setLineWidth(1); doc.circle(M+12, y+bh/2, 5, 'S');
+    if(selected) { doc.setFillColor(...NAVY); doc.circle(M+12, y+bh/2, 3, 'F'); }
+    setFont('bold', 8, selected ? NAVY : TEXT);
+    doc.text(label, M+22, y+12);
+    setFont('normal', 7, GRAY);
+    doc.text(desc, M+22, y+23);
+    y += bh + 4;
+  }
+
+  authBox('Contact me for each order',
+    'C.Y. Flooring will call me to confirm every order.',
+    data.authPref === 'Contact me for each order');
+  authBox('My employee / associate can authorize orders',
+    'They can approve orders on my behalf without calling me each time.',
+    data.authPref === 'My employee can authorize orders');
+
+  if (data.authPref === 'My employee can authorize orders') {
+    // Indented box for employee fields
+    const efH = 52;
+    doc.setFillColor(240,244,255); doc.setDrawColor(199,210,254); doc.setLineWidth(0.5);
+    doc.rect(M+16, y, CW-16, efH, 'FD');
+    const savedY = y;
+    y += 8;
+    const hw = (CW - 16 - 20) / 2;
+    setFont('bold',7,GRAY); doc.text('EMPLOYEE / ASSOCIATE NAME', M+24, y);
+    setFont('normal',9,TEXT); doc.text(data.delegateName||'', M+24, y+13);
+    doc.setDrawColor(...LGRAY); doc.setLineWidth(0.5);
+    doc.line(M+24, y+15, M+24+hw-4, y+15);
+    setFont('bold',7,GRAY); doc.text('THEIR CONTACT NUMBER', M+24+hw+8, y);
+    setFont('normal',9,TEXT); doc.text(data.delegatePhone||'', M+24+hw+8, y+13);
+    doc.line(M+24+hw+8, y+15, M+CW-8, y+15);
+    y = savedY + efH + 6;
+  }
+
+  authBox('Keep my card on file for future phone orders',
+    'C.Y. Flooring can charge this card for future orders without a new form.',
+    data.authPref === 'Keep card on file for future phone orders');
+
+  y += 4;
+
+  // ── SECTION 4 ──
+  sectionBar('4   AGREEMENT & SIGNATURE');
+
+  // Agreement box
+  const agText = 'By signing below, I confirm I am the authorized cardholder and authorize C.Y. Flooring to charge the amount stated above to my card. This authorization remains in effect until I notify C.Y. Flooring in writing to cancel it.';
+  const agLines = doc.splitTextToSize(agText, CW-20);
+  const agH = agLines.length * 11 + 12;
+  doc.setFillColor(...LYELLOW); doc.setDrawColor(...DYELLOW); doc.setLineWidth(0.5);
+  doc.rect(M, y, CW, agH, 'FD');
+  setFont('normal', 7.5, ORANGE);
+  doc.text(agLines, M+8, y+10);
+  y += agH + 8;
+
+  twoFields('PRINT NAME', data.printName, 'DATE', data.date, 0.58);
+
+  // Signature box
+  const sigH = 55;
+  doc.setFillColor(255,255,255); doc.setDrawColor(...LGRAY); doc.setLineWidth(0.5);
+  doc.rect(M, y, CW, sigH, 'FD');
+  setFont('bold', 7, GRAY); doc.text('SIGNATURE', M+6, y+10);
+  // Embed actual signature
+  if(data.sigImage) {
+    try { doc.addImage(data.sigImage, 'PNG', M+6, y+12, CW-12, sigH-18); } catch(e){}
+  }
+  doc.setDrawColor(...LGRAY); doc.setLineWidth(0.3);
+  doc.line(M+10, y+sigH-10, M+CW-10, y+sigH-10);
+  y += sigH + 10;
+
+  // Footer
+  doc.setDrawColor(...LGRAY); doc.setLineWidth(0.5);
+  doc.line(M, y, M+CW, y);
+  setFont('normal', 6.5, GRAY);
+  doc.text('C.Y. Flooring · 1228 Compton Ave, Los Angeles, CA 90021 · 213-806-9926 · This document contains sensitive financial information — keep secure.', W/2, y+10, {align:'center'});
+
+  return doc;
+}
+
+function submitForm() {
+  let ok = true;
+
+  const cardType = document.querySelector('input[name="card_type"]:checked');
+  if (!cardType) { document.getElementById('err-card-type').classList.add('show'); ok=false; }
+  else document.getElementById('err-card-type').classList.remove('show');
+
+  ok = val('card-name','err-card-name', document.getElementById('card-name').value.trim().length > 1) && ok;
+  const cn = document.getElementById('card-number').value.replace(/\s/g,'');
+  ok = val('card-number','err-card-number', cn.length === 16) && ok;
+  ok = val('exp-date','err-exp-date', /\d{2}\s*\/\s*\d{2}/.test(document.getElementById('exp-date').value)) && ok;
+  ok = val('cvv','err-cvv', document.getElementById('cvv').value.length >= 3) && ok;
+  ok = val('contact-phone','err-contact-phone', document.getElementById('contact-phone').value.replace(/\D/g,'').length >= 10) && ok;
+  ok = val('billing-address','err-billing-address', document.getElementById('billing-address').value.trim().length > 5) && ok;
+
+  const authPref = document.querySelector('input[name="auth_pref"]:checked');
+  if (!authPref) { document.getElementById('err-auth-pref').classList.add('show'); ok=false; }
+  else document.getElementById('err-auth-pref').classList.remove('show');
+
+  if (authPref && authPref.value === 'My employee can authorize orders') {
+    ok = val('delegate-name','err-delegate-name', document.getElementById('delegate-name').value.trim().length > 1) && ok;
+    ok = val('delegate-phone','err-delegate-phone', document.getElementById('delegate-phone').value.replace(/\D/g,'').length >= 10) && ok;
+  }
+
+  ok = val('print-name','err-print-name', document.getElementById('print-name').value.trim().length > 1) && ok;
+  if (!hasSig) { document.getElementById('err-sig').classList.add('show'); ok=false; }
+  else document.getElementById('err-sig').classList.remove('show');
+
+  if (!ok) {
+    const first = document.querySelector('.err, .field-error.show');
+    if (first) first.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
+
+  // Collect data
+  formData = {
+    cardType: cardType.value,
+    cardName: document.getElementById('card-name').value,
+    cardNumber: document.getElementById('card-number').value,
+    expDate: document.getElementById('exp-date').value,
+    cvv: document.getElementById('cvv').value,
+    chargeAmount: document.getElementById('charge-amount').value,
+    invoice: document.getElementById('invoice-num').value,
+    phone: document.getElementById('contact-phone').value,
+    billing: document.getElementById('billing-address').value,
+    authPref: authPref.value,
+    delegateName: document.getElementById('delegate-name').value,
+    delegatePhone: document.getElementById('delegate-phone').value,
+    printName: document.getElementById('print-name').value,
+    date: document.getElementById('sign-date').value,
+    sigImage: canvas.toDataURL('image/png'),
+  };
+
+  // Generate and download PDF
+  const doc = generatePDF(formData);
+  doc.save('CY_Flooring_CC_Authorization.pdf');
+
+  document.getElementById('main-form').classList.add('hidden');
+  document.getElementById('success-screen').classList.add('visible');
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function redownload() {
+  if(formData && Object.keys(formData).length) {
+    const doc = generatePDF(formData);
+    doc.save('CY_Flooring_CC_Authorization.pdf');
+  }
+}
+</script>
+</body>
+</html>
